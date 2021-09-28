@@ -5,11 +5,20 @@ const config = {
     partsLabels: {
         "CPU": ["Brand", "Model"],
         "GPU": ["Brand", "Model"],
-        "Memory Card": ["How Many", "Brand", "Model"],
-        // "Storage": ["HDD or SSD", "Storage", "Brand", "Model"],
+        "RAM": ["How_Many", "Brand", "Model"],
+        "Storage": ["HDD_or_SSD", "Storage", "Brand", "Model"],
     },
-    dataBase: [],
+    CPU: [],
+    GPU: [],
+    RAM: [],
+    Storage: [],
     pcCounter: 0,
+    preBuildComputer: {
+        "CPU": "",
+        "GPU": "",
+        "RAM": "",
+        "Storage": "",
+    }
 };
 
 class Computer{
@@ -40,36 +49,36 @@ class Computer{
 };
 
 class View{
-    static createSelectCompornents(partsName, label, optionItemList){
+    static createSelectCompornents(optionItemList){
         //optionItemListにはlabelでfilterした後の配列を渡す
-        let select = document.createElement('select');
-        select.id = "inputGroupSelect" + partsName + label;
-        select.classList.add("custom-select");
-
-        select.innerHTML +=`<option selected>Choose...</option>`;
-        console.log(optionItemList);
+        let optionHTML =`<option selected>Choose...</option>`;
 
         for(let item of optionItemList){
-            select.innerHTML += `<option value="${item}">${item}</option>`
+            optionHTML += `<option value="${item}">${item}</option>`
         };
 
-        return select;
+        return optionHTML;
     };
-    static createSelectParts(partsName, label){
+    static createSelectParts(partsName, label, partsList){
         //各parts, brand/Modelなどlabel毎のselect要素を作成
         let container = document.createElement('div');
         container.classList.add("input-group", "mb-3", "px-3");
         container.innerHTML =
         `
         <div class="input-group-prepend">
-            <label class="input-group-text" for="inputGroupSelect${partsName + label}">${label}</label>
+            <label class="input-group-text" for="inputGroupSelect${partsName + label}">${label.replace(/_/g, " ")}</label>
         </div>
         `
 
-        let partsList = Controller.filterPartsType(partsName);
-        let itemListByLabel = Controller.getOptionItems(partsList, label);
+        let optionItem = Controller.getOptionItems(partsList, label);
 
-        container.append(this.createSelectCompornents(partsName, label, itemListByLabel));
+        let select = document.createElement('select');
+        select.id = "inputGroupSelect" + partsName + label;
+        select.setAttribute("data-label", label);
+        select.classList.add("custom-select", partsName);
+        select.innerHTML = View.createSelectCompornents(optionItem);
+
+        container.append(select);
         return container;
     };
     static createSelectInterface(stepCount, partsName, labels){
@@ -79,14 +88,28 @@ class View{
 
         let h4 = document.createElement('h4');
         h4.innerHTML = `step${stepCount}: Select your ${partsName}`;
+        if(partsName === "RAM"){
+            h4.innerHTML = `step${stepCount}: Select your Memory Card`;
+        }
 
         let innerContainer = document.createElement('div');
         innerContainer.classList.add('d-lg-flex')
 
-        labels.forEach(label => {
-            let selectDiv = this.createSelectParts(partsName, label);
+        //各partsの配列
+        let partsList = config[partsName];
+
+        for(let i=0; i < labels.length; i++){
+            let selectDiv = View.createSelectParts(partsName, labels[i], partsList);
+
+            selectDiv.addEventListener('change', function(){
+                console.log(`${partsName + labels[i]}が変更されました`);
+                Controller.changeOption(partsName);
+
+            })
+
+            // partsList = [];
             innerContainer.append(selectDiv);
-        });
+        }
 
         container.append(h4);
         container.append(innerContainer);
@@ -107,23 +130,13 @@ class View{
         btnDiv.addEventListener('click', function(){
             const detailPage = document.getElementById('detail');
 
-            //test build
-            let cpu;
-            let gpu;
-            let ram;
-            let ssd;
-            let hdd;
-            for(let parts of config.dataBase){
-                // console.log(parts[0]);
-                if(parts[0].Type === "CPU"){ cpu = parts[0]};
-                if(parts[0].Type === "GPU"){ gpu = parts[0]};
-                if(parts[0].Type === "RAM"){ ram = parts[0]};
-                if(parts[0].Type === "SSD"){ ssd = parts[0]};
-                if(parts[0].Type === "HDD"){ hdd = parts[0]};
-            }
-            let addPC = new Computer(cpu, gpu, ram, hdd);
+            //build pc
+            let cpu = config.preBuildComputer["CPU"][0];
+            let gpu = config.preBuildComputer["GPU"][0];
+            let ram = config.preBuildComputer["RAM"][0];
+            let storage = config.preBuildComputer["Storage"][0];
 
-
+            let addPC = new Computer(cpu, gpu, ram, storage);
             detailPage.append(View.getComputerDetailPage(addPC));
         });
 
@@ -145,6 +158,7 @@ class View{
         let count = 1;
 
         for(let key in config.partsLabels){
+
             let selectDiv = View.createSelectInterface(count, key, config.partsLabels[key]);
             inputContainer.append(selectDiv);
             count++;
@@ -238,33 +252,101 @@ class View{
 
 
 class Controller{
+    static initialize(){
+        Controller.getPartsData();
+
+        setTimeout(function(){
+            config.target.append(View.getSelectPage());
+        },100);
+    }
     static getPartsData(){
         for(let parts of config.parts){
             fetch(config.url + parts).then(response => response.json()).then(data => {
-                config.dataBase.push(data);
+                if(parts === "hdd" || parts === "ssd"){
+                    config["Storage"] = config["Storage"].concat(data);
+                }else{
+                    config[parts.toUpperCase()] = config[parts.toUpperCase()].concat(data);
+                }
             });
         }
     }
-    static filterPartsType(type){
-        let partsType = type;
-        if(type === "Memory Card"){ partsType = "RAM"};
-        for(let partsList of config.dataBase){
-            let partsByType = partsList.filter(parts => parts.Type === partsType);
+    static filterPartsLabel(arr, partsLabel, value){
+        //How_Many, HDD_or_SSD, Storageに対応できていない
+        if(partsLabel === "HDD_or_SSD"){
+            return arr.filter(parts => parts["Type"] === value);
 
-            if(partsByType.length > 0){ return partsByType };
+        }else if(partsLabel === "How_Many"){
+            return arr.filter(parts => Controller.getNumberOfMemoryCards(parts["Model"]) === value);
+
+        }else if(partsLabel === "Storage"){
+            return arr.filter(parts => Controller.getStorageSize(parts["Model"]) === value);
+
+        }else{
+            return arr.filter(parts => parts[partsLabel] === value);
         }
     };
-    static filterPartsLabel(arr, partsLabel, value){
-        return arr.filter(parts => parts[partsLabel] === value);
-    };
-    static getOptionItems(arr, key){
+    static getOptionItems(arr, label){
         //labelでfilterされた後のoptionを配列で返す
-        let resArr = arr.map(parts => parts[key]);
+        let resArr;
+
+        if(label === "How_Many"){
+            //labelがhow manyの時はmodelの配列を取得し、model名からメモリカード枚数を取得
+            resArr = arr.map(parts => parts["Model"]);
+            resArr = resArr.map(model => Controller.getNumberOfMemoryCards(model));
+        }else if(label === "HDD_or_SSD"){
+            resArr = arr.map(parts => parts["Type"]);
+        }else if(label === "Storage"){
+            resArr = arr.map(parts => parts["Model"]);
+            resArr = resArr.map(model => Controller.getStorageSize(model));
+        }else{
+            resArr = arr.map(parts => parts[label]);
+        }
+
         return new Set(resArr);
+    };
+    static changeOption(partsName){
+        //optionが変更された時の挙動
+        //CPU要素ならCPUのパーツリストを取得
+        //choose以外の要素でfilterをかける
+        //filterにかけた配列をchoose...となっている要素に入れる
+
+        //変更後の値を読取
+        let selectNodes = document.querySelectorAll("." + partsName);
+
+        //partsListを取得
+        let partsList = config[partsName];
+
+        //選ばれているラベルの値でpartsListを更新
+        selectNodes.forEach(selectNode => {
+            if(selectNode.value !== "Choose..."){
+                let label = selectNode.getAttribute("data-label");
+                partsList = Controller.filterPartsLabel(partsList, label, selectNode.value);
+            }
+        });
+
+        //選択していないoption listを更新
+        selectNodes.forEach(selectNode => {
+            if(selectNode.value === "Choose..."){
+                let label = selectNode.getAttribute("data-label");
+                let partsListByLabel = Controller.getOptionItems(partsList, label);
+                selectNode.innerHTML = "";
+                selectNode.innerHTML = View.createSelectCompornents(partsListByLabel);
+            }
+        });
+
+        console.log(partsList);
+        if(partsList.length === 1){
+            config.preBuildComputer[partsName] = partsList;
+            console.log(config.preBuildComputer[partsName][0]);
+        }
+
     };
     static getStorageSize(model){
         //model名を引数としてStorageサイズを返す
-        return model.split(" ").pop();
+        let regex = /\d{1,3}[TG]B/g;
+        let storage = model.match(regex);
+
+        return storage[0];
     };
     static getNumberOfMemoryCards(model){
         //モデル名を引数としてメモリーカードの枚数を返す
@@ -275,27 +357,4 @@ class Controller{
 };
 
 
-
-// ---------TEST-------------
-Controller.getPartsData();
-setTimeout(function(){
-    // console.log(config.dataBase);
-    // let partsList = Controller.filterPartsType("CPU");
-    // console.log(partsList);
-    // let optionItems1 = Controller.getOptionItems(partsList, "Model");
-    // let optionItems2 = Controller.getOptionItems(partsList, "Brand");
-    // console.log(optionItems1);
-    // console.log(optionItems2);
-
-    // console.log(Controller.filterPartsLabel(partsList, "Brand", "Intel"));
-    // console.log(Controller.filterPartsLabel(partsList, "Brand", "AMD"));
-    config.target.append(View.getSelectPage());
-},100);
-
-
-// let storageSize = Controller.getStorageSize("900P Optane NVMe PCIe 280GB");
-// console.log(storageSize);
-
-// let numberOfMemoryCards = Controller.getNumberOfMemoryCards("Ripjaws 4 DDR4 2400 C14 1x16GB");
-// console.log(numberOfMemoryCards);
-
+Controller.initialize();
