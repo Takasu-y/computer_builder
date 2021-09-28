@@ -101,13 +101,12 @@ class View{
         for(let i=0; i < labels.length; i++){
             let selectDiv = View.createSelectParts(partsName, labels[i], partsList);
 
+            //要素が変更された時の挙動
             selectDiv.addEventListener('change', function(){
-                console.log(`${partsName + labels[i]}が変更されました`);
-                Controller.changeOption(partsName);
-
+                Controller.changeOption(partsName, labels[i]);
+                console.log(config.preBuildComputer);
             })
 
-            // partsList = [];
             innerContainer.append(selectDiv);
         }
 
@@ -128,16 +127,20 @@ class View{
 
         //controllerで入力値のデータを取得 → オブジェクト作成
         btnDiv.addEventListener('click', function(){
-            const detailPage = document.getElementById('detail');
+            if(Controller.isValid()){
+                const detailPage = document.getElementById('detail');
 
-            //build pc
-            let cpu = config.preBuildComputer["CPU"][0];
-            let gpu = config.preBuildComputer["GPU"][0];
-            let ram = config.preBuildComputer["RAM"][0];
-            let storage = config.preBuildComputer["Storage"][0];
+                //build pc
+                let cpu = config.preBuildComputer["CPU"][0];
+                let gpu = config.preBuildComputer["GPU"][0];
+                let ram = config.preBuildComputer["RAM"][0];
+                let storage = config.preBuildComputer["Storage"][0];
 
-            let addPC = new Computer(cpu, gpu, ram, storage);
-            detailPage.append(View.getComputerDetailPage(addPC));
+                let addPC = new Computer(cpu, gpu, ram, storage);
+                detailPage.append(View.getComputerDetailPage(addPC));
+            }else{
+                alert("パーツを全て選択してください");
+            }
         });
 
         return btnDiv;
@@ -304,11 +307,19 @@ class Controller{
 
         return new Set(resArr);
     };
-    static changeOption(partsName){
+    static updateOptionList(nodeList, partsList){
+        //選択していないoption listを更新
+        nodeList.forEach(selectNode => {
+            if(selectNode.value === "Choose..."){
+                let label = selectNode.getAttribute("data-label");
+                let partsListByLabel = Controller.getOptionItems(partsList, label);
+                selectNode.innerHTML = "";
+                selectNode.innerHTML = View.createSelectCompornents(partsListByLabel);
+            }
+        });
+    };
+    static changeOption(partsName, currLabel){
         //optionが変更された時の挙動
-        //CPU要素ならCPUのパーツリストを取得
-        //choose以外の要素でfilterをかける
-        //filterにかけた配列をchoose...となっている要素に入れる
 
         //変更後の値を読取
         let selectNodes = document.querySelectorAll("." + partsName);
@@ -325,21 +336,27 @@ class Controller{
         });
 
         //選択していないoption listを更新
-        selectNodes.forEach(selectNode => {
-            if(selectNode.value === "Choose..."){
-                let label = selectNode.getAttribute("data-label");
-                let partsListByLabel = Controller.getOptionItems(partsList, label);
-                selectNode.innerHTML = "";
-                selectNode.innerHTML = View.createSelectCompornents(partsListByLabel);
-            }
-        });
-
+        Controller.updateOptionList(selectNodes, partsList);
         console.log(partsList);
+
         if(partsList.length === 1){
             config.preBuildComputer[partsName] = partsList;
-            console.log(config.preBuildComputer[partsName][0]);
+        }else if(partsList.length === 0){
+            Controller.partOfResetOption(partsName, currLabel);
         }
+    };
+    static partOfResetOption(partsName, currLabel){
+        let selects = document.querySelectorAll(`.${partsName}`);
 
+        for(let select of selects){
+            if(currLabel !== select.getAttribute("data-label")){
+                select.innerHTML = "<option selected>Choose...</option>";
+            };
+        }
+        config.preBuildComputer[partsName] = "";
+
+        //再度option listを更新する
+        Controller.changeOption(partsName);
     };
     static getStorageSize(model){
         //model名を引数としてStorageサイズを返す
@@ -353,7 +370,16 @@ class Controller{
         return model.split(" ").pop().split("x").shift();
     }
 
-    static buildComputer(){};
+    static isValid(){
+        //全て選択されていればtrueを返す
+        //未選択のものがある場合はfalseを返す
+        let selectNodes = document.querySelectorAll(".custom-select");
+
+        for(let selectNode of selectNodes){
+            if(selectNode.value === "Choose..."){ return false;}
+        }
+        return true;
+    };
 };
 
 
