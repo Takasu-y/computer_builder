@@ -260,7 +260,7 @@ class Controller{
 
         setTimeout(function(){
             config.target.append(View.getSelectPage());
-        },100);
+        },300);
     }
     static getPartsData(){
         for(let parts of config.parts){
