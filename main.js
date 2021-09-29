@@ -126,7 +126,7 @@ class View{
         `
 
         //controllerで入力値のデータを取得 → オブジェクト作成
-        btnDiv.addEventListener('click', function(){
+        btnDiv.querySelectorAll(".btn-lg")[0].addEventListener('click', function(){
             if(Controller.isValid()){
                 const detailPage = document.getElementById('detail');
 
@@ -338,11 +338,12 @@ class Controller{
         //選択していないoption listを更新
         Controller.updateOptionList(selectNodes, partsList);
         console.log(partsList);
+        console.log(new Set(partsList));
 
-        if(partsList.length === 1){
-            config.preBuildComputer[partsName] = partsList;
-        }else if(partsList.length === 0){
+        if(partsList.length === 0){
             Controller.partOfResetOption(partsName, currLabel);
+        }else if(partsList.length <= 2){
+            config.preBuildComputer[partsName] = partsList;
         }
     };
     static partOfResetOption(partsName, currLabel){
