@@ -104,7 +104,7 @@ class View{
             //要素が変更された時の挙動
             selectDiv.addEventListener('change', function(){
                 Controller.changeOption(partsName, labels[i]);
-                console.log(config.preBuildComputer);
+                // console.log(config.preBuildComputer);
             })
 
             innerContainer.append(selectDiv);
@@ -337,8 +337,7 @@ class Controller{
 
         //選択していないoption listを更新
         Controller.updateOptionList(selectNodes, partsList);
-        console.log(partsList);
-        console.log(new Set(partsList));
+        // console.log(partsList);
 
         if(partsList.length === 0){
             Controller.partOfResetOption(partsName, currLabel);
